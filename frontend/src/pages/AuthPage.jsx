@@ -136,10 +136,19 @@ export default function AuthPage({ initialMode = 'login' }) {
           }),
         });
 
-        const data = await response.json();
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
 
         if (!response.ok) {
-          throw new Error(data.message || 'Registration failed.');
+          const fallbackMessage =
+            response.status === 504 || response.status === 502 || response.status === 500
+              ? 'Backend server is not running on port 5000. Start it in a terminal using: cd backend; npm run dev'
+              : `Server returned error (${response.status}).`;
+          throw new Error(data?.message || fallbackMessage);
         }
 
         setFeedback({
