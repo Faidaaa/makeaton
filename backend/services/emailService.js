@@ -97,7 +97,11 @@ export const sendPasswordResetEmail = async ({ to, resetUrl }) => {
 
     const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) {
-      console.log(`[EmailService] Preview email at: ${previewUrl}`);
+      console.log(`[EmailService] Preview email in Ethereal: ${previewUrl}`);
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[EmailService] Direct reset link (dev mode): ${resetUrl}`);
     }
 
     return { success: true, messageId: info.messageId, previewUrl };
@@ -107,3 +111,4 @@ export const sendPasswordResetEmail = async ({ to, resetUrl }) => {
     return { success: false, error: error.message };
   }
 };
+
