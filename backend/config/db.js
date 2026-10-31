@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 // In-memory mock store for resilient zero-dependency fallback when MongoDB is not running locally
 class MemoryStore {
@@ -30,31 +30,36 @@ class MemoryStore {
   }
 }
 
-const memoryStore = new MemoryStore();
-let isUsingMemoryStore = false;
+export const memoryStore = new MemoryStore();
+let isUsingMemoryStoreFlag = false;
+export const isUsingMemoryStore = () => isUsingMemoryStoreFlag;
 
-const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/brightloop_subscriptions';
-  
+/**
+ * Single authoritative MongoDB Atlas connection for Brightloop.
+ * Reads MONGO_URI / MONGODB_URI from process.env and targets 'brightloop' database.
+ */
+export const connectDB = async () => {
+  const mongoURI = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+  if (!mongoURI) {
+    console.warn('[Database] No MONGO_URI provided. Activating in-memory storage fallback.');
+    isUsingMemoryStoreFlag = true;
+    return null;
+  }
+
   try {
-    mongoose.set('strictQuery', false);
-    // Fast failover for instant startup
-    await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 600,
-      connectTimeoutMS: 600
+    const conn = await mongoose.connect(mongoURI, {
+      dbName: 'brightloop',
     });
-    console.log(`[Database] MongoDB connected successfully to ${uri}`);
-    isUsingMemoryStore = false;
-  } catch (err) {
-    console.warn(`[Database] MongoDB connection skipped/unavailable (${err.message}).`);
-    console.log('[Database] Activating high-performance built-in memory storage fallback.');
-    console.log('[Database] System will operate with full CRUD, RBAC, and analytics functionality without requiring an external MongoDB server!');
-    isUsingMemoryStore = true;
+
+    console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host} | DB: ${conn.connection.name}`);
+    isUsingMemoryStoreFlag = false;
+    return conn;
+  } catch (error) {
+    console.warn(`[MongoDB] Connection failed (${error.message}). Activating memory fallback.`);
+    isUsingMemoryStoreFlag = true;
+    return null;
   }
 };
 
-module.exports = {
-  connectDB,
-  memoryStore,
-  isUsingMemoryStore: () => isUsingMemoryStore
-};
+export default connectDB;

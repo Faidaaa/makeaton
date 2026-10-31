@@ -1,274 +1,410 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { User } = require('../models');
-const { JWT_SECRET, validatePassword } = require('../middleware/auth');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import User from '../models/User.js';
+import { isPasswordValid, getPasswordErrors } from '../utils/passwordValidator.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
-exports.register = async (req, res) => {
+/** Cookie settings matching Task 5 specifications */
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  path: '/',
+});
+
+/**
+ * Register a new customer account
+ * POST /api/auth/register
+ */
+export const registerCustomer = async (req, res, next) => {
   try {
-    const { name, email, password, company, phone } = req.body;
+    const { email, password, fullName, name, company, phone } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required.',
+      });
     }
 
-    // Password validation rule from Odoo hackathon problem statement:
-    // "the password must be more than eight characters, with an uppercase letter, a lowercase letter and a special character."
-    const pwdCheck = validatePassword(password);
-    if (!pwdCheck.valid) {
-      return res.status(400).json({ success: false, message: pwdCheck.message });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address.',
+      });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const existing = await User.findOne({ email: cleanEmail });
-    if (existing) {
-      return res.status(400).json({ success: false, message: 'Each email can belong to only one account. This email is already registered.' });
+    if (!isPasswordValid(password)) {
+      const passwordErrors = getPasswordErrors(password);
+      return res.status(400).json({
+        success: false,
+        message: `Password does not meet security requirements: ${passwordErrors.join(' ')}`,
+        errors: passwordErrors,
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email address already exists.',
+      });
+    }
+
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
     const user = await User.create({
-      name: name.trim(),
-      email: cleanEmail,
-      password: hashedPassword,
-      role: 'customer', // Public registration creates customer accounts
-      company: company ? company.trim() : '',
-      phone: phone ? phone.trim() : ''
+      email: normalizedEmail,
+      passwordHash,
+      fullName: (fullName || name || '').trim(),
+      name: (name || fullName || '').trim(),
+      company: (company || '').trim(),
+      phone: (phone || '').trim(),
+      role: 'customer',
     });
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email, name: user.name },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: 'Account created successfully! Welcome to Brightloop Software.',
-      token,
+      message: 'Account created successfully! Welcome to Brightloop.',
       user: {
         id: user._id,
-        name: user.name,
         email: user.email,
+        fullName: user.fullName || user.name,
+        name: user.name || user.fullName,
         role: user.role,
-        company: user.company
-      }
+        createdAt: user.createdAt,
+      },
     });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Registration failed', error: err.message });
+  } catch (error) {
+    next(error);
   }
 };
 
-exports.login = async (req, res) => {
+/** Alias for compatibility */
+export const register = registerCustomer;
+
+/**
+ * Log in with email and password
+ * POST /api/auth/login
+ */
+export const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required.',
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password.',
+      });
+    }
+
+    const hashToCompare = user.passwordHash || user.password;
+    const isMatch = hashToCompare ? await bcrypt.compare(password, hashToCompare) : false;
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password.',
+      });
+    }
+
+    if (user.isActive !== undefined && !user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is deactivated. Please contact an administrator.',
+      });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role, email: user.email, name: user.name || user.fullName },
+      process.env.JWT_SECRET || 'brightloop_jwt_secret',
+      { expiresIn: '24h' }
+    );
+
+    res.cookie('token', token, getCookieOptions());
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful.',
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName || user.name,
+        name: user.name || user.fullName,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Alias for compatibility */
+export const login = loginUser;
+
+/**
+ * Current user profile
+ * GET /api/auth/me
+ */
+export const getCurrentUser = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      id: req.user._id,
+      email: req.user.email,
+      name: req.user.name || req.user.fullName,
+      fullName: req.user.fullName || req.user.name,
+      role: req.user.role,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Alias for compatibility */
+export const me = getCurrentUser;
+
+/**
+ * Log out user / clear cookie
+ * POST /api/auth/logout
+ */
+export const logoutUser = async (req, res, next) => {
+  try {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** Alias for compatibility */
+export const logout = logoutUser;
+
+/**
+ * Forgot password request
+ * POST /api/auth/forgot-password
+ */
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is required.',
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+      await user.save();
+
+      try {
+        await sendPasswordResetEmail(user.email, resetToken);
+      } catch (emailErr) {
+        console.error('[Auth] Failed to dispatch reset email:', emailErr.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a password reset link has been dispatched.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reset password using token
+ * POST /api/auth/reset-password
+ */
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token and new password are required.',
+      });
+    }
+
+    if (!isPasswordValid(password)) {
+      const passwordErrors = getPasswordErrors(password);
+      return res.status(400).json({
+        success: false,
+        message: `Password does not meet requirements: ${passwordErrors.join(' ')}`,
+        errors: passwordErrors,
+      });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password reset token is invalid, expired, or has already been used.',
+      });
+    }
+
+    const saltRounds = 12;
+    user.passwordHash = await bcrypt.hash(password, saltRounds);
+    user.password = user.passwordHash;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully. You may now log in with your new password.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * List staff members (admin only)
+ * GET /api/users/staff
+ */
+export const listStaff = async (req, res, next) => {
+  try {
+    const staff = await User.find({ role: { $in: ['admin', 'staff'] } }).select('-passwordHash -password');
+    res.status(200).json({
+      success: true,
+      staff: staff.map((s) => ({
+        id: s._id,
+        name: s.name || s.fullName,
+        email: s.email,
+        role: s.role,
+        company: s.company,
+        createdAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Create staff member (admin only)
+ * POST /api/admin/create-staff or POST /api/users/staff
+ */
+export const createStaff = async (req, res, next) => {
+  try {
+    const { name, fullName, email, password, role, company, phone } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required.' });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: cleanEmail });
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password.' });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email, name: user.name },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    return res.json({
-      success: true,
-      message: `Welcome back, ${user.name}!`,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        company: user.company
-      }
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Login failed', error: err.message });
-  }
-};
-
-exports.me = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    return res.json({
-      success: true,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        company: user.company,
-        phone: user.phone
-      }
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Failed to fetch user', error: err.message });
-  }
-};
-
-exports.forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
-
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    if (!user) {
-      // Don't disclose existence for security, but acknowledge
-      return res.json({
-        success: true,
-        message: 'If that email is registered, a password reset link has been dispatched to your inbox.'
+    if (!isPasswordValid(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password does not meet requirements.',
+        errors: getPasswordErrors(password),
       });
-    }
-
-    const resetToken = 'reset_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-    const expires = new Date(Date.now() + 3600000); // 1 hour
-
-    await User.findByIdAndUpdate(user._id, {
-      resetPasswordToken: resetToken,
-      resetPasswordExpires: expires
-    });
-
-    return res.json({
-      success: true,
-      message: `Reset link dispatched to registered email (${user.email}).`,
-      // For demo simulation / testing:
-      simulationResetToken: resetToken,
-      resetUrl: `/reset-password?token=${resetToken}`
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Password reset request failed', error: err.message });
-  }
-};
-
-exports.resetPassword = async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-    if (!token || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Token and new password are required' });
-    }
-
-    const pwdCheck = validatePassword(newPassword);
-    if (!pwdCheck.valid) {
-      return res.status(400).json({ success: false, message: pwdCheck.message });
-    }
-
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gte: new Date() }
-    });
-
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired password reset link.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await User.findByIdAndUpdate(user._id, {
-      password: hashedPassword,
-      resetPasswordToken: null,
-      resetPasswordExpires: null
-    });
-
-    return res.json({
-      success: true,
-      message: 'Password reset successful! You can now log in with your new password.'
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Password reset failed', error: err.message });
-  }
-};
-
-// Admin only: list staff members
-exports.listStaff = async (req, res) => {
-  try {
-    const staff = await User.find({ role: { $in: ['admin', 'staff'] } });
-    return res.json({
-      success: true,
-      staff: staff.map(s => ({
-        id: s._id,
-        name: s.name,
-        email: s.email,
-        role: s.role,
-        company: s.company,
-        createdAt: s.createdAt
-      }))
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Failed to list staff', error: err.message });
-  }
-};
-
-// Admin only: add staff member
-exports.createStaff = async (req, res) => {
-  try {
-    const { name, email, password, role, company, phone } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
-    }
-
-    const pwdCheck = validatePassword(password);
-    if (!pwdCheck.valid) {
-      return res.status(400).json({ success: false, message: pwdCheck.message });
     }
 
     const cleanEmail = email.toLowerCase().trim();
     const existing = await User.findOne({ email: cleanEmail });
     if (existing) {
-      return res.status(400).json({ success: false, message: 'This email is already in use.' });
+      return res.status(409).json({ success: false, message: 'This email is already in use.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
     const newStaff = await User.create({
-      name: name.trim(),
+      name: (name || fullName || '').trim(),
+      fullName: (fullName || name || '').trim(),
       email: cleanEmail,
-      password: hashedPassword,
+      passwordHash,
+      password: passwordHash,
       role: role === 'admin' ? 'admin' : 'staff',
       company: company ? company.trim() : 'Brightloop Software',
-      phone: phone ? phone.trim() : ''
+      phone: phone ? phone.trim() : '',
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: `Staff member ${newStaff.name} created successfully!`,
+      message: `Staff account created successfully!`,
+      user: {
+        id: newStaff._id,
+        name: newStaff.name,
+        fullName: newStaff.fullName,
+        email: newStaff.email,
+        role: newStaff.role,
+        createdAt: newStaff.createdAt,
+      },
       staff: {
         id: newStaff._id,
         name: newStaff.name,
         email: newStaff.email,
-        role: newStaff.role
-      }
+        role: newStaff.role,
+      },
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: 'Failed to create staff member', error: err.message });
+    next(err);
   }
 };
 
-// Get all customers (for admin & staff dropdowns)
-exports.listCustomers = async (req, res) => {
+/**
+ * List all customers (for admin & staff dropdowns)
+ * GET /api/users/customers
+ */
+export const listCustomers = async (req, res, next) => {
   try {
-    const customers = await User.find({ role: 'customer' });
-    return res.json({
+    const customers = await User.find({ role: 'customer' }).select('-passwordHash -password');
+    res.status(200).json({
       success: true,
-      customers: customers.map(c => ({
+      customers: customers.map((c) => ({
         id: c._id,
-        name: c.name,
+        name: c.name || c.fullName,
         email: c.email,
         company: c.company,
-        phone: c.phone
-      }))
+        phone: c.phone,
+      })),
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: 'Failed to list customers', error: err.message });
+    next(err);
   }
 };

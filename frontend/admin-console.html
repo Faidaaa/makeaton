@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brightloop Software — Admin Console</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+</head>
+<body>
+
+  <!-- Top Navigation Bar (Design System Specification) -->
+  <header class="navbar">
+    <div class="brand-wrapper" onclick="AdminConsole.switchAdminSubTab('dashboard')">
+      <div class="brand-logo-mark">BL</div>
+      <div>
+        <div class="brand-title">Brightloop</div>
+        <div class="label-mono" style="font-size:0.65rem; color:var(--text-secondary);">Administration Console</div>
+      </div>
+    </div>
+
+    <!-- Quick Action CTAs in Header -->
+    <div style="display:flex; align-items:center; gap:0.6rem;">
+      <button class="btn btn-secondary btn-sm" onclick="AdminConsole.openNewProductModal()">
+        + Launch Product
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="AdminConsole.openNewPlanModal()">
+        + Define Plan
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="AdminConsole.openNewTaxModal()">
+        + Tax Rule
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="AdminConsole.openNewDiscountModal()">
+        + Discount Rule
+      </button>
+    </div>
+
+    <!-- Admin Profile Badge -->
+    <div class="nav-user-panel">
+      <span class="role-badge admin">ADMINISTRATOR</span>
+      <span style="font-weight:700; font-size:0.9rem;" id="nav-admin-name">Eleanor Vance</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Admin Profile Banner Area -->
+    <div class="admin-profile-banner">
+      <div class="admin-profile-left">
+        <div class="admin-avatar" id="admin-banner-avatar">AD</div>
+        <div>
+          <div class="admin-profile-name">
+            <span id="admin-banner-name">Administrator</span>
+            <span class="role-badge admin">SUPERUSER</span>
+          </div>
+          <div class="admin-profile-details">
+            <span id="admin-banner-email">admin@brightloop.com</span> &bull; 
+            <span id="admin-banner-company">Brightloop Software Headquarters</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="AdminConsole.switchAdminSubTab('settings')">System Settings</button>
+      </div>
+    </div>
+
+    <!-- Tabs Navigation Bar -->
+    <nav class="nav-tabs" aria-label="Admin Navigation">
+      <button class="tab-item active" data-tab="dashboard" onclick="AdminConsole.switchAdminSubTab('dashboard')">Overview</button>
+      <button class="tab-item" data-tab="products" onclick="AdminConsole.switchAdminSubTab('products')">Products & Variants</button>
+      <button class="tab-item" data-tab="plans" onclick="AdminConsole.switchAdminSubTab('plans')">Subscription Plans</button>
+      <button class="tab-item" data-tab="taxes" onclick="AdminConsole.switchAdminSubTab('taxes')">Tax Engine</button>
+      <button class="tab-item" data-tab="discounts" onclick="AdminConsole.switchAdminSubTab('discounts')">Discount Rules</button>
+      <button class="tab-item" data-tab="staff" onclick="AdminConsole.switchAdminSubTab('staff')">Staff Management</button>
+    </nav>
+
+    <!-- Sub-tab contents -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="stat-grid" id="dashboard-stats-grid">
+        <div class="card stat-card"><div class="stat-label">Active Subscriptions</div><div class="stat-value" id="stat-active-subs">-</div></div>
+        <div class="card stat-card"><div class="stat-label">Monthly Recurring (MRR)</div><div class="stat-value" id="stat-mrr">-</div></div>
+        <div class="card stat-card"><div class="stat-label">Active Catalog Products</div><div class="stat-value" id="stat-products">-</div></div>
+        <div class="card stat-card"><div class="stat-label">Plans Configured</div><div class="stat-value" id="stat-plans">-</div></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

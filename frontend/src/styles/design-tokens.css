@@ -1,0 +1,46 @@
+/* ==========================================================================
+   BRIGHTLOOP DESIGN SYSTEM TOKENS
+   Authoritative Reference: design.md
+   ========================================================================== */
+
+:root {
+  /* Surface & Background Colors */
+  --bg-primary: #fcfbf9;         /* Warm neutral background */
+  --bg-surface: #ffffff;         /* Pure white container surface */
+  --bg-subtle: #f4f3f0;          /* Secondary panel/card background */
+
+  /* Text & Border Colors */
+  --text-primary: #111827;       /* Deep charcoal / near black */
+  --text-secondary: #6b7280;     /* Muted grey for subtext and captions */
+  --border-strong: #000000;      /* Crisp, high-contrast black border */
+  --border-subtle: #e5e7eb;      /* Soft structural dividers */
+
+  /* Accent & State Colors */
+  --accent-primary: #ff4f00;     /* Electric vermilion / high-energy orange */
+  --accent-secondary: #2563eb;   /* Deep electric blue */
+  --accent-light: #fff4ed;       /* Light tint background for callouts */
+
+  /* Contextual Feedback & State Colors */
+  --accent-success: #15803d;     /* High-legibility forest green */
+  --accent-success-light: #f0fdf4;
+  --accent-error: #dc2626;       /* Clean warning red */
+  --accent-error-light: #fef2f2;
+  
+  /* Typography Variables */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+
+  /* Tactile Offsets & Micro-interactions */
+  --shadow-tactile: 2px 2px 0 var(--border-strong);
+  --shadow-tactile-hover: 4px 4px 0 var(--border-strong);
+  --shadow-tactile-active: 1px 1px 0 var(--border-strong);
+  --shadow-card: 3px 3px 0 var(--border-strong);
+
+  /* Spacing Scale */
+  --space-xs: 0.25rem;  /* 4px */
+  --space-sm: 0.5rem;   /* 8px */
+  --space-md: 1rem;     /* 16px */
+  --space-lg: 1.5rem;   /* 24px */
+  --space-xl: 2rem;     /* 32px */
+  --space-2xl: 3rem;    /* 48px */
+}

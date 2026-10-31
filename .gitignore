@@ -9,7 +9,8 @@ client/dist/
 
 # Environment files
 .env
-.env*.local
+.env.*
+!.env.example
 server/.env
 
 # Logs
@@ -24,7 +25,3 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
-node_modules/
-.env
-npm-debug.log*
-.DS_Store
