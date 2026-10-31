@@ -1,0 +1,82 @@
+.logo-link {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.brightloop-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  user-select: none;
+}
+
+.logo-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-surface);
+  border: 2px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-tactile);
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.logo-link:hover .logo-symbol {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-tactile-hover);
+}
+
+.logo-sm .logo-symbol {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+}
+
+.logo-md .logo-symbol {
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+}
+
+.logo-lg .logo-symbol {
+  width: 48px;
+  height: 48px;
+  padding: 8px;
+}
+
+.logo-text-group {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.logo-name {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+}
+
+.logo-sm .logo-name {
+  font-size: 1.125rem;
+}
+
+.logo-md .logo-name {
+  font-size: 1.35rem;
+}
+
+.logo-lg .logo-name {
+  font-size: 1.75rem;
+}
+
+.logo-name-accent {
+  color: var(--accent-primary);
+}
+
+.logo-sublabel {
+  color: var(--text-secondary);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  margin-top: 0.125rem;
+}
