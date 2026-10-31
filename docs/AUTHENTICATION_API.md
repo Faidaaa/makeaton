@@ -284,3 +284,4 @@ To protect frontend dashboard routes, wrap them in `<ProtectedRoute>` in `App.js
 />
 ```
 Users without the required role will be redirected to their role portal automatically (`/admin`, `/staff`, or `/customer`), and unauthenticated users will be redirected to `/login`.
+
