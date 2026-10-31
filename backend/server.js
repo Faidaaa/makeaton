@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
@@ -21,9 +22,10 @@ app.use(
   })
 );
 
-// 2. Body Parser Middleware
+// 2. Body Parser and Cookie Parser Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // 3. Health Endpoint (GET /api/health)
 app.get('/api/health', (req, res) => {

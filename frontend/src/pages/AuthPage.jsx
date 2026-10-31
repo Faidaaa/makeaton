@@ -175,16 +175,73 @@ export default function AuthPage({ initialMode = 'login' }) {
       return;
     }
 
+    // Live user login connected to backend MongoDB API
+    if (mode === 'login') {
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formData.email.trim().toLowerCase(),
+            password: formData.password,
+          }),
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (!response.ok) {
+          const fallbackMessage =
+            response.status === 429
+              ? 'Too many login attempts. Please wait a few minutes before trying again.'
+              : response.status === 401
+              ? 'Invalid email or password.'
+              : response.status === 504 || response.status === 502 || response.status === 500
+              ? 'Backend server is not running on port 5000. Start it in a terminal using: cd backend; npm run dev'
+              : `Server returned error (${response.status}).`;
+          throw new Error(data?.message || fallbackMessage);
+        }
+
+        const role = data.user?.role || 'customer';
+
+        setFeedback({
+          type: 'success',
+          title: 'Login Successful',
+          message: `Authenticated as ${role.toUpperCase()}. Redirecting to your workspace...`,
+        });
+
+        // Role-based redirection without localStorage
+        setTimeout(() => {
+          if (role === 'admin') {
+            navigate('/admin');
+          } else if (role === 'staff') {
+            navigate('/staff');
+          } else {
+            navigate('/customer');
+          }
+        }, 900);
+      } catch (err) {
+        setFeedback({
+          type: 'error',
+          title: 'Authentication Failed',
+          message: err.message || 'Invalid email or password.',
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     setTimeout(() => {
       setLoading(false);
 
-      if (mode === 'login') {
-        setFeedback({
-          type: 'success',
-          title: 'Authentication Verified (Mock)',
-          message: `Ready for backend session attachment: ${formData.email.trim().toLowerCase()}`,
-        });
-      } else if (mode === 'forgot') {
+      if (mode === 'forgot') {
         setForgotSentEmail(formData.email.trim().toLowerCase());
       } else if (mode === 'reset') {
         setResetSuccess(true);
