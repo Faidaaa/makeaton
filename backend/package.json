@@ -1,0 +1,33 @@
+{
+  "name": "brightloop-subscription-management",
+  "version": "1.0.0",
+  "description": "Subscription Management System for Brightloop Software - Odoo Hackathon",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test/member2.test.js && node test/rbac.test.js",
+    "test:member2": "node test/member2.test.js",
+    "test:rbac": "node test/rbac.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5"
+  },
+  "keywords": [
+    "odoo",
+    "subscription-management",
+    "billing",
+    "mrr",
+    "invoicing",
+    "mongodb",
+    "express",
+    "javascript"
+  ],
+  "author": "Brightloop Engineering Team",
+  "license": "MIT"
+}

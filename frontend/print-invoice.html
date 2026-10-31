@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice Printable - Brightloop Software</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background: #ffffff;
+      padding: 2.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .print-header {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--border-strong);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .print-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;" class="no-print">
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+
+  <div id="print-content">
+    <div class="print-header">
+      <div>
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+          <div class="brand-logo-mark">BL</div>
+          <div class="brand-title">Brightloop Software Inc.</div>
+        </div>
+        <p class="text-muted" style="font-size:0.85rem;">
+          100 Innovation Boulevard, Tech Park<br>
+          San Francisco, CA 94105<br>
+          billing@brightloop.com
+        </p>
+      </div>
+
+      <div style="text-align:right;">
+        <h1 style="font-size:2.5rem; margin-bottom:0.25rem;">INVOICE</h1>
+        <div class="stat-value" id="inv-num" style="font-size:1.5rem;">INV-2026-XXXX</div>
+        <div id="inv-status-pill" style="margin-top:0.5rem;"></div>
+      </div>
+    </div>
+
+    <div class="print-meta-grid">
+      <div>
+        <div class="label-mono">Billed To</div>
+        <h3 id="cust-name">Customer Name</h3>
+        <p id="cust-company" style="font-weight:600;"></p>
+        <p id="cust-email" class="text-muted"></p>
+        <p id="cust-phone" class="text-muted"></p>
+      </div>
+
+      <div style="text-align:right;">
+        <p><strong>Issue Date:</strong> <span id="inv-date">-</span></p>
+        <p><strong>Payment Due:</strong> <span id="inv-due">-</span></p>
+        <p><strong>Subscription Reference:</strong> <span id="inv-sub-num">-</span></p>
+      </div>
+    </div>
+
+    <table class="table-custom" style="margin-bottom:2rem;">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th style="text-align:center;">Qty</th>
+          <th style="text-align:right;">Unit Price</th>
+          <th style="text-align:right;">Tax</th>
+          <th style="text-align:right;">Discount</th>
+          <th style="text-align:right;">Line Total</th>
+        </tr>
+      </thead>
+      <tbody id="lines-tbody"></tbody>
+    </table>
+
+    <div style="display:flex; justify-content:flex-end;">
+      <div style="width:320px; border:2px solid var(--border-strong); padding:1.25rem; border-radius:6px; background:var(--bg-subtle);">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+          <span>Subtotal:</span>
+          <span id="inv-subtotal">$0.00</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem; color:var(--success);">
+          <span>Discount:</span>
+          <span id="inv-discount">-$0.00</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.6rem;">
+          <span>Taxes:</span>
+          <span id="inv-tax">$0.00</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; border-top:2px solid var(--border-strong); padding-top:0.6rem; font-size:1.2rem; font-weight:800;">
+          <span>Total Billed:</span>
+          <span id="inv-total">$0.00</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:0.5rem; font-weight:600;">
+          <span>Amount Paid:</span>
+          <span id="inv-paid">$0.00</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:0.25rem; font-weight:700; color:var(--danger); font-size:1.1rem;">
+          <span>Balance Due:</span>
+          <span id="inv-due-balance">$0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:3rem; border-top:1px solid var(--border-subtle); padding-top:1rem; font-size:0.85rem;" class="text-muted">
+      <p>Thank you for choosing Brightloop Software. Payment terms: Wire transfer or Credit Card within net period.</p>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('id');
+      if (!id) return;
+
+      try {
+        const res = await API.getInvoice(id);
+        if (!res.success) return;
+        const inv = res.invoice;
+
+        document.getElementById('inv-num').textContent = inv.invoiceNumber;
+        document.getElementById('inv-status-pill').innerHTML = `<span class="badge badge-${inv.status.toLowerCase()}">${inv.status}</span>`;
+        document.getElementById('cust-name').textContent = inv.customer?.name || 'Customer';
+        document.getElementById('cust-company').textContent = inv.customer?.company || '';
+        document.getElementById('cust-email').textContent = inv.customer?.email || '';
+        document.getElementById('cust-phone').textContent = inv.customer?.phone || '';
+
+        document.getElementById('inv-date').textContent = new Date(inv.issueDate).toLocaleDateString();
+        document.getElementById('inv-due').textContent = new Date(inv.dueDate).toLocaleDateString();
+        document.getElementById('inv-sub-num').textContent = inv.subscription?.subscriptionNumber || 'N/A';
+
+        const linesTbody = document.getElementById('lines-tbody');
+        linesTbody.innerHTML = inv.lines.map(l => `
+          <tr>
+            <td><strong>${l.description}</strong></td>
+            <td style="text-align:center;">${l.quantity}</td>
+            <td style="text-align:right;">$${l.unitPrice.toFixed(2)}</td>
+            <td style="text-align:right;">$${(l.taxAmount || 0).toFixed(2)} (${l.taxRate}%)</td>
+            <td style="text-align:right;">-$${(l.discountAmount || 0).toFixed(2)}</td>
+            <td style="text-align:right;"><strong>$${l.total.toFixed(2)}</strong></td>
+          </tr>
+        `).join('');
+
+        document.getElementById('inv-subtotal').textContent = `$${(inv.subtotal || 0).toFixed(2)}`;
+        document.getElementById('inv-discount').textContent = `-$${(inv.discountAmount || 0).toFixed(2)}`;
+        document.getElementById('inv-tax').textContent = `$${(inv.taxAmount || 0).toFixed(2)}`;
+        document.getElementById('inv-total').textContent = `$${inv.totalAmount.toFixed(2)}`;
+        document.getElementById('inv-paid').textContent = `$${(inv.amountPaid || 0).toFixed(2)}`;
+        document.getElementById('inv-due-balance').textContent = `$${inv.amountDue.toFixed(2)}`;
+      } catch (err) {
+        alert('Failed to load invoice: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
