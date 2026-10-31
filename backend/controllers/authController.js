@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { isPasswordValid, getPasswordErrors } from '../utils/passwordValidator.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 /**
  * Cookie options helper for consistent JWT session management.
@@ -188,6 +190,115 @@ export const logoutUser = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Logged out successfully.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Request password recovery email
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email address is required.',
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    // If user exists, generate cryptographically secure reset token
+    if (user) {
+      // Generate unhashed random bytes (sent only via email)
+      const rawToken = crypto.randomBytes(32).toString('hex');
+
+      // Store only the SHA-256 hash in the database
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour validity
+      await user.save();
+
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const resetUrl = `${clientUrl}/reset-password?token=${rawToken}`;
+
+      await sendPasswordResetEmail({
+        to: user.email,
+        resetUrl,
+      });
+    }
+
+    // Always return a generic success message to prevent account enumeration
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists with this email address, a password recovery link has been dispatched.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Reset password using cryptographic token
+ * @route   POST /api/auth/reset-password
+ * @access  Public
+ */
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token and new password are required.',
+      });
+    }
+
+    // Validate new password against security rules
+    if (!isPasswordValid(password)) {
+      const passwordErrors = getPasswordErrors(password);
+      return res.status(400).json({
+        success: false,
+        message: `Password does not meet security requirements: ${passwordErrors.join(' ')}`,
+      });
+    }
+
+    // Compute SHA-256 hash of incoming token to compare with database
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find account with valid, non-expired token
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired password reset token.',
+      });
+    }
+
+    // Hash the new password with bcryptjs
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(password, salt);
+
+    // Invalidate the reset token to prevent reuse
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password has been updated successfully. You may now sign in with your new credentials.',
     });
   } catch (error) {
     next(error);

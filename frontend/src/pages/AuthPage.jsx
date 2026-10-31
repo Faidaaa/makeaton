@@ -32,8 +32,16 @@ export default function AuthPage({ initialMode = 'login' }) {
   const [mode, setMode] = useState(resolveMode);
 
   useEffect(() => {
-    setMode(resolveMode());
-  }, [location.pathname]);
+    const currentMode = resolveMode();
+    setMode(currentMode);
+    if (currentMode === 'reset' && !searchParams.get('token')) {
+      setFeedback({
+        type: 'warning',
+        title: 'Missing Reset Token',
+        message: 'No reset token was detected in the URL. Please use the link sent to your email or enter your credentials below.',
+      });
+    }
+  }, [location.pathname, searchParams]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -238,15 +246,91 @@ export default function AuthPage({ initialMode = 'login' }) {
       return;
     }
 
-    setTimeout(() => {
-      setLoading(false);
+    // Live password recovery request connected to backend
+    if (mode === 'forgot') {
+      try {
+        const response = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formData.email.trim().toLowerCase(),
+          }),
+        });
 
-      if (mode === 'forgot') {
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(data?.message || 'Failed to dispatch recovery link.');
+        }
+
         setForgotSentEmail(formData.email.trim().toLowerCase());
-      } else if (mode === 'reset') {
-        setResetSuccess(true);
+      } catch (err) {
+        setFeedback({
+          type: 'error',
+          title: 'Request Failed',
+          message: err.message || 'Could not send reset link. Please try again.',
+        });
+      } finally {
+        setLoading(false);
       }
-    }, 700);
+      return;
+    }
+
+    // Live password reset connected to backend
+    if (mode === 'reset') {
+      const resetToken = searchParams.get('token');
+      if (!resetToken) {
+        setFeedback({
+          type: 'error',
+          title: 'Missing Reset Token',
+          message: 'No reset token was found in the URL. Please request a new recovery link.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: resetToken,
+            password: formData.password,
+          }),
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(data?.message || 'Password reset failed.');
+        }
+
+        setResetSuccess(true);
+      } catch (err) {
+        setFeedback({
+          type: 'error',
+          title: 'Reset Failed',
+          message: err.message || 'Unable to update password. Token may be expired or already used.',
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
   };
 
   // Live password checklist rule computations
