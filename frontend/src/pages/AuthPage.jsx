@@ -14,10 +14,10 @@ import './AuthPage.css';
 
 /**
  * Brightloop Single-Screen Zero-Scroll Authentication Interface.
- * Strictly adheres to design.md and all Task 3 requirements.
- * Modes: 'login' | 'signup' | 'forgot' | 'reset'
+ * Strictly adheres to design.md and all project specifications.
+ * Supports universal and dedicated role logins (Customer, Staff, Admin).
  */
-export default function AuthPage({ initialMode = 'login' }) {
+export default function AuthPage({ initialMode = 'login', initialRole }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -32,9 +32,19 @@ export default function AuthPage({ initialMode = 'login' }) {
     return initialMode || 'login';
   };
 
-  const [mode, setMode] = useState(resolveMode);
+  // Resolve active portal role (customer | staff | admin)
+  const resolveRole = () => {
+    if (initialRole) return initialRole;
+    const path = location.pathname;
+    if (path.includes('/admin/login')) return 'admin';
+    if (path.includes('/staff/login')) return 'staff';
+    return 'customer';
+  };
 
-  // If already authenticated and visiting auth pages, navigate to portal
+  const [mode, setMode] = useState(resolveMode);
+  const [activeRole, setActiveRole] = useState(resolveRole);
+
+  // If already authenticated and visiting auth pages, navigate to respective portal
   useEffect(() => {
     if (user && mode !== 'reset') {
       const target = user.role === 'admin' ? '/admin' : user.role === 'staff' ? '/staff' : '/customer';
@@ -43,16 +53,17 @@ export default function AuthPage({ initialMode = 'login' }) {
   }, [user, mode, navigate]);
 
   useEffect(() => {
-    const currentMode = resolveMode();
-    setMode(currentMode);
-    if (currentMode === 'reset' && !searchParams.get('token')) {
+    setMode(resolveMode());
+    setActiveRole(resolveRole());
+
+    if (resolveMode() === 'reset' && !searchParams.get('token')) {
       setFeedback({
         type: 'warning',
         title: 'Missing Reset Token',
         message: 'No reset token was detected in the URL. Please use the link sent to your email or enter your credentials below.',
       });
     }
-  }, [location.pathname, searchParams]);
+  }, [location.pathname, initialRole, searchParams]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -68,6 +79,16 @@ export default function AuthPage({ initialMode = 'login' }) {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [forgotSentEmail, setForgotSentEmail] = useState(null);
 
+  // Switch dedicated role portals
+  const handleRoleSwitch = (targetRole) => {
+    setActiveRole(targetRole);
+    setErrors({});
+    setFeedback(null);
+    if (targetRole === 'admin') navigate('/admin/login');
+    else if (targetRole === 'staff') navigate('/staff/login');
+    else navigate('/customer/login');
+  };
+
   // Switch tabs/modes cleanly without layout shift or page refresh
   const handleModeSwitch = (newMode) => {
     setMode(newMode);
@@ -76,8 +97,11 @@ export default function AuthPage({ initialMode = 'login' }) {
     setResetSuccess(false);
     setForgotSentEmail(null);
 
-    // Sync URL cleanly
-    if (newMode === 'login') navigate('/login', { replace: true });
+    if (newMode === 'login') {
+      if (activeRole === 'admin') navigate('/admin/login', { replace: true });
+      else if (activeRole === 'staff') navigate('/staff/login', { replace: true });
+      else navigate('/customer/login', { replace: true });
+    }
     else if (newMode === 'signup') navigate('/signup', { replace: true });
     else if (newMode === 'forgot') navigate('/forgot-password', { replace: true });
     else if (newMode === 'reset') navigate('/reset-password', { replace: true });
@@ -183,11 +207,19 @@ export default function AuthPage({ initialMode = 'login' }) {
 
         const role = data.user?.role || 'customer';
 
-        setFeedback({
-          type: 'success',
-          title: 'Login Successful',
-          message: `Authenticated as ${role.toUpperCase()}. Redirecting to your workspace...`,
-        });
+        if (activeRole && activeRole !== role) {
+          setFeedback({
+            type: 'success',
+            title: 'Login Successful',
+            message: `Account is assigned the ${role.toUpperCase()} role. Redirecting to your workspace...`,
+          });
+        } else {
+          setFeedback({
+            type: 'success',
+            title: 'Login Successful',
+            message: `Authenticated as ${role.toUpperCase()}. Redirecting to your workspace...`,
+          });
+        }
 
         // Role-based redirection
         setTimeout(() => {
@@ -275,8 +307,43 @@ export default function AuthPage({ initialMode = 'login' }) {
             {/* Mobile Branding (Displayed only when left panel is hidden on smaller screens) */}
             <div className="auth-mobile-header">
               <Logo size="sm" showSubtitle={false} to="/login" />
-              <span className="auth-mobile-badge label-mono">AUTH GATEWAY</span>
+              <span className="auth-mobile-badge label-mono">
+                {activeRole ? `${activeRole.toUpperCase()} GATEWAY` : 'AUTH GATEWAY'}
+              </span>
             </div>
+
+            {/* Dedicated Role Tabs Switch (Customer / Staff / Admin) */}
+            {mode === 'login' && (
+              <div className="role-switch-wrapper" role="tablist" aria-label="Portal Selection">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRole === 'customer'}
+                  className={`role-tab label-mono ${activeRole === 'customer' ? 'role-tab-active' : ''}`}
+                  onClick={() => handleRoleSwitch('customer')}
+                >
+                  CUSTOMER
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRole === 'staff'}
+                  className={`role-tab label-mono ${activeRole === 'staff' ? 'role-tab-active' : ''}`}
+                  onClick={() => handleRoleSwitch('staff')}
+                >
+                  STAFF
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRole === 'admin'}
+                  className={`role-tab label-mono ${activeRole === 'admin' ? 'role-tab-active' : ''}`}
+                  onClick={() => handleRoleSwitch('admin')}
+                >
+                  ADMIN
+                </button>
+              </div>
+            )}
 
             {/* Segmented Switch for Login / Signup (Only shown when in login/signup mode) */}
             {(mode === 'login' || mode === 'signup') && (
@@ -305,13 +372,21 @@ export default function AuthPage({ initialMode = 'login' }) {
             {/* Form Heading Section */}
             <header className="auth-form-header">
               <h1 className="auth-form-title">
-                {mode === 'login' && 'Welcome back'}
+                {mode === 'login' && (
+                  activeRole === 'admin' ? 'Admin Console Sign In' :
+                  activeRole === 'staff' ? 'Staff Workspace Sign In' :
+                  'Customer Portal Sign In'
+                )}
                 {mode === 'signup' && 'Create Customer Account'}
                 {mode === 'forgot' && 'Reset Password'}
                 {mode === 'reset' && 'Set New Password'}
               </h1>
               <p className="auth-form-subtitle">
-                {mode === 'login' && 'Sign in to access your Brightloop workspace.'}
+                {mode === 'login' && (
+                  activeRole === 'admin' ? 'Sign in with administrator credentials to manage platform, catalogs, and staff.' :
+                  activeRole === 'staff' ? 'Sign in to manage quotations, customer accounts, and subscription lifecycles.' :
+                  'Sign in to manage your active subscriptions, invoices, and payments.'
+                )}
                 {mode === 'signup' && 'Register for subscription management and recurring billing.'}
                 {mode === 'forgot' && 'Enter your email to receive a secure recovery token.'}
                 {mode === 'reset' && 'Choose a strong password compliant with security policy.'}
@@ -386,7 +461,11 @@ export default function AuthPage({ initialMode = 'login' }) {
                     type="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="name@company.com"
+                    placeholder={
+                      mode === 'login' && activeRole === 'admin' ? 'admin@brightloop.com' :
+                      mode === 'login' && activeRole === 'staff' ? 'staff@brightloop.com' :
+                      'name@company.com'
+                    }
                     required
                     autoComplete="email"
                     autoFocus
@@ -425,115 +504,84 @@ export default function AuthPage({ initialMode = 'login' }) {
                   />
                 )}
 
-                {/* Compact Live Password Policy Helper (Signup, Reset) */}
-                {(mode === 'signup' || mode === 'reset') && formData.password.length > 0 && (
+                {/* Compact Live Password Checklist Bar */}
+                {(mode === 'signup' || mode === 'reset') && (
                   <div className="compact-policy-bar" aria-live="polite">
-                    <span className="policy-label label-mono">POLICY:</span>
-                    <span className={`policy-item ${passwordRules.minLength ? 'valid' : ''}`}>&gt;8 chars</span>
+                    <span className="policy-label">POLICY:</span>
+                    <span className={`policy-item ${passwordRules.hasMinLength ? 'valid' : ''}`}>
+                      &gt;8 Chars {passwordRules.hasMinLength ? '✓' : ''}
+                    </span>
                     <span className="policy-dot">•</span>
-                    <span className={`policy-item ${passwordRules.hasUpper ? 'valid' : ''}`}>1+ uppercase</span>
+                    <span className={`policy-item ${passwordRules.hasUpper ? 'valid' : ''}`}>
+                      Upper {passwordRules.hasUpper ? '✓' : ''}
+                    </span>
                     <span className="policy-dot">•</span>
-                    <span className={`policy-item ${passwordRules.hasLower ? 'valid' : ''}`}>1+ lowercase</span>
+                    <span className={`policy-item ${passwordRules.hasLower ? 'valid' : ''}`}>
+                      Lower {passwordRules.hasLower ? '✓' : ''}
+                    </span>
                     <span className="policy-dot">•</span>
-                    <span className={`policy-item ${passwordRules.hasSpecial ? 'valid' : ''}`}>1+ special</span>
+                    <span className={`policy-item ${passwordRules.hasSpecial ? 'valid' : ''}`}>
+                      Special {passwordRules.hasSpecial ? '✓' : ''}
+                    </span>
                   </div>
                 )}
 
-                {/* Action Row for Login: Remember Me & Forgot Password */}
+                {/* Helper Row: Remember Me & Forgot Password (Login mode only) */}
                 {mode === 'login' && (
-                  <div className="auth-action-row">
-                    <label className="auth-checkbox-label" htmlFor="rememberMe">
+                  <div className="auth-helper-row">
+                    <label className="auth-remember-label">
                       <input
                         type="checkbox"
-                        id="rememberMe"
                         name="rememberMe"
                         checked={formData.rememberMe}
                         onChange={handleChange}
                         className="sr-only"
                       />
-                      <span className="checkbox-box" aria-hidden="true">
-                        {formData.rememberMe ? (
-                          <CheckSquare size={14} className="checkbox-icon checked" />
-                        ) : (
-                          <Square size={14} className="checkbox-icon" />
-                        )}
-                      </span>
-                      <span className="checkbox-text">Remember session</span>
+                      {formData.rememberMe ? (
+                        <CheckSquare size={16} className="checkbox-icon checked" />
+                      ) : (
+                        <Square size={16} className="checkbox-icon" />
+                      )}
+                      <span>Remember session</span>
                     </label>
 
                     <button
                       type="button"
-                      className="link-forgot-btn"
+                      className="auth-link-button label-mono"
                       onClick={() => handleModeSwitch('forgot')}
                     >
-                      Forgot password?
+                      FORGOT PASSWORD?
                     </button>
                   </div>
                 )}
 
-                {/* Submit Action Button */}
-                <div className="auth-submit-group">
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    shape="pill"
-                    size="md"
-                    fullWidth
-                    loading={loading}
-                    icon={mode === 'forgot' ? <Mail size={16} /> : mode === 'reset' ? <Lock size={16} /> : <ArrowRight size={16} />}
-                  >
-                    {mode === 'login' && 'Sign in to Brightloop'}
-                    {mode === 'signup' && 'Create Customer Account'}
-                    {mode === 'forgot' && 'Send Recovery Link'}
-                    {mode === 'reset' && 'Update Password'}
-                  </Button>
-                </div>
-
-                {/* Navigation Back / Mode Switchers */}
-                {mode === 'login' && (
-                  <div className="auth-secondary-prompt">
-                    <span>Don't have an account yet?</span>{' '}
-                    <button
-                      type="button"
-                      className="switch-mode-btn"
-                      onClick={() => handleModeSwitch('signup')}
-                    >
-                      Sign up as Customer
-                    </button>
-                  </div>
-                )}
-
-                {mode === 'signup' && (
-                  <div className="auth-secondary-prompt">
-                    <span>Already have an account?</span>{' '}
-                    <button
-                      type="button"
-                      className="switch-mode-btn"
-                      onClick={() => handleModeSwitch('login')}
-                    >
-                      Sign in here
-                    </button>
-                  </div>
-                )}
-
-                {(mode === 'forgot' || mode === 'reset') && (
-                  <div className="auth-secondary-prompt">
-                    <button
-                      type="button"
-                      className="back-to-login-link"
-                      onClick={() => handleModeSwitch('login')}
-                    >
-                      <ArrowLeft size={14} />
-                      <span>Return to Sign In</span>
-                    </button>
-                  </div>
-                )}
+                {/* Submit Action CTA Button */}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  shape="pill"
+                  size="md"
+                  fullWidth
+                  loading={loading}
+                  icon={<ArrowRight size={16} />}
+                >
+                  {mode === 'login' && (
+                    activeRole === 'admin' ? 'Sign In as Administrator' :
+                    activeRole === 'staff' ? 'Sign In to Workspace' :
+                    'Sign In to Customer Portal'
+                  )}
+                  {mode === 'signup' && 'Create Customer Account'}
+                  {mode === 'forgot' && 'Send Recovery Link'}
+                  {mode === 'reset' && 'Update Password'}
+                </Button>
               </form>
             )}
 
-            {/* Bottom Security Monospace Tag */}
+            {/* Zero-scroll Micro Footer */}
             <footer className="auth-card-footer">
-              <span className="label-mono">HTTP-ONLY SESSION • RBAC RESTRICTED</span>
+              <span className="footer-lock-badge label-mono">
+                <Lock size={11} /> 256-BIT ENCRYPTION &bull; RBAC ENFORCED
+              </span>
             </footer>
           </div>
         </main>
@@ -541,4 +589,3 @@ export default function AuthPage({ initialMode = 'login' }) {
     </div>
   );
 }
-

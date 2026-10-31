@@ -14,13 +14,18 @@ export default function App() {
           {/* Default route redirects to universal login */}
           <Route path="/" element={<Navigate to="/login" replace />} />
 
-          {/* Unified Single-Screen Authentication Interface */}
-          <Route path="/login" element={<AuthPage initialMode="login" />} />
+          {/* Universal & Dedicated Role-Specific Login Portals */}
+          <Route path="/login" element={<AuthPage initialMode="login" initialRole="customer" />} />
+          <Route path="/admin/login" element={<AuthPage initialMode="login" initialRole="admin" />} />
+          <Route path="/staff/login" element={<AuthPage initialMode="login" initialRole="staff" />} />
+          <Route path="/customer/login" element={<AuthPage initialMode="login" initialRole="customer" />} />
+
+          {/* Account Creation & Recovery */}
           <Route path="/signup" element={<AuthPage initialMode="signup" />} />
           <Route path="/forgot-password" element={<AuthPage initialMode="forgot" />} />
           <Route path="/reset-password" element={<AuthPage initialMode="reset" />} />
 
-          {/* Role-Based Destination Portals — each protected by role */}
+          {/* Role-Based Destination Portals — each protected by RBAC */}
           <Route
             path="/customer"
             element={

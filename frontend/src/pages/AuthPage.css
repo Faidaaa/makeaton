@@ -78,6 +78,43 @@
   color: var(--text-secondary);
 }
 
+/* Role Switcher (Customer / Staff / Admin tabs) */
+.role-switch-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background-color: var(--bg-subtle);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9999px;
+  padding: 2px;
+  gap: 2px;
+  box-shadow: 1px 1px 0 var(--border-strong);
+}
+
+.role-tab {
+  background: transparent;
+  border: none;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  padding: clamp(0.3rem, 0.7vh, 0.45rem) 0.35rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  text-align: center;
+}
+
+.role-tab:hover:not(.role-tab-active) {
+  color: var(--text-primary);
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.role-tab.role-tab-active {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  box-shadow: 1px 1px 0 var(--border-strong);
+}
+
 /* Segmented Tab Switch (design.md high-contrast toggle) */
 .segmented-switch-wrapper {
   display: grid;

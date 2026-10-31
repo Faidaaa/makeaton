@@ -285,3 +285,11 @@ To protect frontend dashboard routes, wrap them in `<ProtectedRoute>` in `App.js
 ```
 Users without the required role will be redirected to their role portal automatically (`/admin`, `/staff`, or `/customer`), and unauthenticated users will be redirected to `/login`.
 
+### 4.4 Dedicated Role Login Routes
+The application provides both universal and dedicated role-specific login routes:
+- `/admin/login` — Dedicated Admin Console login (pre-selects ADMIN tab, custom admin branding).
+- `/staff/login` — Dedicated Staff Workspace login (pre-selects STAFF tab, workspace branding).
+- `/customer/login` or `/login` — Customer Portal login.
+
+Users can also switch between role portals dynamically using the interactive segmented switch on the login screen. Regardless of the entry route, the backend securely validates credentials and enforces role-based redirection to the authorized destination (`/admin`, `/staff`, or `/customer`).
+
