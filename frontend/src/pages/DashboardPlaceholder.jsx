@@ -1,67 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, LogOut, User, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, LogOut } from 'lucide-react';
 import Logo from '../components/common/Logo';
 import Button from '../components/common/Button';
+import { useAuth } from '../context/AuthContext';
 import './AuthPage.css';
 
 /**
  * Clean role-based workspace landing page.
- * Validates session against GET /api/auth/me and provides logout capability.
+ * Uses useAuth() from AuthContext for state and session management.
  */
 export default function DashboardPlaceholder({ expectedRole = 'customer' }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (!response.ok) {
-          throw new Error('Not authenticated.');
-        }
-        const data = await response.json();
-        setUser(data);
-      } catch (err) {
-        setError(err.message);
-        setTimeout(() => navigate('/login'), 1500);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSession();
-  }, [navigate]);
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await logout();
     } finally {
       navigate('/login');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="auth-viewport-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div className="label-mono" style={{ color: 'var(--text-secondary)' }}>
-          VERIFYING SESSION...
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !user) {
-    return (
-      <div className="auth-viewport-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div className="compact-success-card" style={{ maxWidth: 400 }}>
-          <h2 className="compact-success-title">Session Expired</h2>
-          <p className="compact-success-desc">Redirecting to login portal...</p>
-        </div>
-      </div>
-    );
+  if (!user) {
+    return null; // ProtectedRoute will handle redirection to /login
   }
 
   return (
@@ -101,10 +63,9 @@ export default function DashboardPlaceholder({ expectedRole = 'customer' }) {
         </div>
 
         <div className="label-mono" style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-          BRIGHTLOOP RBAC SESSION ACTIVE // USER ID: {user.id}
+          BRIGHTLOOP RBAC SESSION ACTIVE // USER ID: {user.id || user._id}
         </div>
       </div>
     </div>
   );
 }
-

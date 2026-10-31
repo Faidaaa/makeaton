@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import { notFoundHandler, errorHandler } from './middleware/errorMiddleware.js';
 import authRoutes from './routes/authRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // Initialize environment variables from .env
 dotenv.config();
@@ -52,6 +53,7 @@ app.get('/api/health', (req, res) => {
 
 // 4. API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 5. Centralized Error Handling
 app.use(notFoundHandler);

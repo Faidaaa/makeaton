@@ -8,6 +8,8 @@ import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import AuthIllustration from '../components/auth/AuthIllustration';
 import { validatePasswordRules, isPasswordValid } from '../components/auth/PasswordChecklist';
+import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/authService';
 import './AuthPage.css';
 
 /**
@@ -19,6 +21,7 @@ export default function AuthPage({ initialMode = 'login' }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user, login } = useAuth();
 
   // Resolve current active mode from route path or prop
   const resolveMode = () => {
@@ -30,6 +33,14 @@ export default function AuthPage({ initialMode = 'login' }) {
   };
 
   const [mode, setMode] = useState(resolveMode);
+
+  // If already authenticated and visiting auth pages, navigate to portal
+  useEffect(() => {
+    if (user && mode !== 'reset') {
+      const target = user.role === 'admin' ? '/admin' : user.role === 'staff' ? '/staff' : '/customer';
+      navigate(target, { replace: true });
+    }
+  }, [user, mode, navigate]);
 
   useEffect(() => {
     const currentMode = resolveMode();
@@ -133,31 +144,10 @@ export default function AuthPage({ initialMode = 'login' }) {
     // Live customer registration connected to backend MongoDB API
     if (mode === 'signup') {
       try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: formData.email.trim().toLowerCase(),
-            password: formData.password,
-          }),
-        });
-
-        let data = null;
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
-
-        if (!response.ok) {
-          const fallbackMessage =
-            response.status === 504 || response.status === 502 || response.status === 500
-              ? 'Backend server is not running on port 5000. Start it in a terminal using: cd backend; npm run dev'
-              : `Server returned error (${response.status}).`;
-          throw new Error(data?.message || fallbackMessage);
-        }
+        const data = await authService.register(
+          formData.email.trim().toLowerCase(),
+          formData.password
+        );
 
         setFeedback({
           type: 'success',
@@ -186,35 +176,10 @@ export default function AuthPage({ initialMode = 'login' }) {
     // Live user login connected to backend MongoDB API
     if (mode === 'login') {
       try {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: formData.email.trim().toLowerCase(),
-            password: formData.password,
-          }),
-        });
-
-        let data = null;
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
-
-        if (!response.ok) {
-          const fallbackMessage =
-            response.status === 429
-              ? 'Too many login attempts. Please wait a few minutes before trying again.'
-              : response.status === 401
-              ? 'Invalid email or password.'
-              : response.status === 504 || response.status === 502 || response.status === 500
-              ? 'Backend server is not running on port 5000. Start it in a terminal using: cd backend; npm run dev'
-              : `Server returned error (${response.status}).`;
-          throw new Error(data?.message || fallbackMessage);
-        }
+        const data = await login(
+          formData.email.trim().toLowerCase(),
+          formData.password
+        );
 
         const role = data.user?.role || 'customer';
 
@@ -224,7 +189,7 @@ export default function AuthPage({ initialMode = 'login' }) {
           message: `Authenticated as ${role.toUpperCase()}. Redirecting to your workspace...`,
         });
 
-        // Role-based redirection without localStorage
+        // Role-based redirection
         setTimeout(() => {
           if (role === 'admin') {
             navigate('/admin');
@@ -249,27 +214,7 @@ export default function AuthPage({ initialMode = 'login' }) {
     // Live password recovery request connected to backend
     if (mode === 'forgot') {
       try {
-        const response = await fetch('/api/auth/forgot-password', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: formData.email.trim().toLowerCase(),
-          }),
-        });
-
-        let data = null;
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
-
-        if (!response.ok) {
-          throw new Error(data?.message || 'Failed to dispatch recovery link.');
-        }
-
+        await authService.forgotPassword(formData.email.trim().toLowerCase());
         setForgotSentEmail(formData.email.trim().toLowerCase());
       } catch (err) {
         setFeedback({
@@ -297,28 +242,7 @@ export default function AuthPage({ initialMode = 'login' }) {
       }
 
       try {
-        const response = await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            token: resetToken,
-            password: formData.password,
-          }),
-        });
-
-        let data = null;
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
-
-        if (!response.ok) {
-          throw new Error(data?.message || 'Password reset failed.');
-        }
-
+        await authService.resetPassword(resetToken, formData.password);
         setResetSuccess(true);
       } catch (err) {
         setFeedback({
