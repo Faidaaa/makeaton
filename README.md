@@ -1,105 +1,126 @@
-# Brightloop Subscription Management System
+# Brightloop Subscription Management System (SUBNEX)
 
-### Member 3: Staff Workspace, Quotation Builder & Subscription Lifecycle
-
-This repository contains the full-stack implementation for **Member 3** of the Brightloop Subscription Management System.
+Brightloop is a modern, enterprise-grade **Subscription Management & Revenue Orchestration Platform** built for the Odoo Hackathon following the provided **Design System Specification & Style Guide (`design.md`)**.
 
 ---
 
-## Architecture Overview
+## 🏗️ Platform Architecture & Member Modules
+
+The system brings together four specialized modules into an integrated revenue operations engine:
 
 ```text
 makeaton/
-├── client/                     # Frontend: React (Vite) + Custom Design System (design.md)
-│   ├── src/
-│   │   ├── components/common/  # Reusable UI tokens: Button, Card, Badge, Modal, Navbar
-│   │   ├── pages/
-│   │   │   ├── StaffWorkspace.jsx      # Module A: Staff Dashboard & Overview
-│   │   │   ├── QuotationBuilder.jsx    # Module B: Interactive Quotation Creator
-│   │   │   ├── QuotationList.jsx       # Module B: Quotation Directory
-│   │   │   ├── QuotationDetail.jsx     # Module B: Quotation Breakdown & Conversion
-│   │   │   ├── SubscriptionList.jsx    # Module C: Subscriptions Directory
-│   │   │   └── SubscriptionDetail.jsx  # Module C: Lifecycle Progression Pipeline
-│   │   ├── services/api.js             # API Client & Mock Fallback Adapters
-│   │   └── index.css                   # High-contrast 2px black border design system
-├── server/                     # Backend: Node.js + Express + Mongoose (MongoDB)
-│   ├── src/
-│   │   ├── models/             # Mongoose schemas: Quotation.js, Subscription.js
-│   │   ├── controllers/        # Request controllers: staff, quotation, subscription
-│   │   ├── routes/             # API routes: /api/staff, /api/quotations, /api/subscriptions
-│   │   ├── utils/              # Calculation engine & lifecycle state machine validator
-│   │   └── server.js           # Server entry point
-└── package.json                # Root workspace configuration
+├── backend/                    # Core Backend: Node.js (ESM) + Express + MongoDB Atlas + JWT Cookies
+│   ├── config/                 # MongoDB Atlas connection with in-memory failover
+│   ├── controllers/            # Auth, Admin RBAC, Products, Plans, Taxes, Discounts, Invoices, Telemetry
+│   ├── middleware/             # protect (JWT Cookie / Bearer), requireRole (RBAC), errorMiddleware
+│   ├── models/                 # User.js, schemas.js (Products, Plans, Taxes, Discounts, Invoices)
+│   ├── routes/                 # /api/auth, /api/admin, /api/products, /api/plans, /api/taxes, etc.
+│   └── server.js               # Unified API server
+│
+├── frontend/                   # Member 1 Auth Gateway & Member 2 Admin Console
+│   ├── src/                    # React (Vite) single-screen zero-scroll authentication app
+│   │   ├── components/auth/    # Segmented role switchers, password checklist, illustrations
+│   │   ├── context/AuthContext # Global session manager (verifies GET /api/auth/me on load)
+│   │   ├── pages/AuthPage.jsx  # Customer / Staff / Admin dedicated login portals
+│   │   └── services/authService# Centralized API client with credentials: 'include'
+│   └── admin-console.html      # Member 2 High-contrast HTML/JS Administrative Console
+│
+├── client/                     # Member 3: React (Vite) Staff Workspace & Quotation Builder
+│   ├── src/pages/StaffWorkspace.jsx
+│   ├── src/pages/QuotationBuilder.jsx
+│   └── src/pages/SubscriptionDetail.jsx
+│
+├── server/                     # Member 3: Quotation & Subscription lifecycle backend
+│   └── src/routes/quotationRoutes.js
+│
+└── docs/
+    └── AUTHENTICATION_API.md   # Complete API & RBAC developer guide
 ```
 
 ---
 
-## Implemented Modules (Member 3 Scope)
+## 👥 Module Breakdown
 
-### Module A: Staff Workspace
-- Real-time KPI statistics: Active Subscriptions, Open Quotations, Active Pipeline ARR/MRR Value, Lifecycle Health.
-- Structured recent quotation and subscription tables with search and view filters.
-- Responsive, high-contrast dashboard with crisp 2px black borders.
+### 1. Member 1: Authentication & RBAC Gateway
+- **Single-Screen Zero-Scroll Auth Interface:** 100dvh viewport locking, high-contrast segmented role switcher (`Customer Portal`, `Staff Workspace`, `Admin Console`).
+- **Dedicated Portals:**
+  - `/login` / `/customer/login` $\rightarrow$ Customer Portal sign-in
+  - `/staff/login` $\rightarrow$ Staff Workspace sign-in
+  - `/admin/login` $\rightarrow$ Admin Console sign-in
+- **Security & Session Architecture:**
+  - Salted and hashed passwords with bcrypt (work factor 12).
+  - Signed JWTs stored exclusively in `HttpOnly`, `SameSite=Lax` cookies (no tokens in `localStorage`).
+  - Cryptographically secure password reset workflow (`POST /api/auth/forgot-password`, `POST /api/auth/reset-password`).
+  - Strict Role-Based Access Control (`admin`, `staff`, `customer`) via `roleMiddleware.js` and `<ProtectedRoute>`.
 
-### Module B: Quotation Builder
-- Customer picker & base subscription plan picker.
-- Catalog add-on integration: dynamic product search, automatic price lookup, and quantity modification.
-- Real-time financial engine: calculates line item subtotals, configurable tax rates, quotation subtotals, and grand totals.
-- Reusable quotation templates support (save as template, load from existing template).
-- Validity date controls, payment terms selection ("Net 30", "Net 15", "Due on Receipt").
-- One-click quotation conversion into a confirmed subscription.
+### 2. Member 2: Admin Console & Product Catalog
+- **Products & Brand Variants:** Multi-tier product setup, price adjustments, and dynamic SKU generation.
+- **Plan Engine:** Billing cadences (daily, weekly, monthly, yearly), minimum commitments, and lifecycle dates.
+- **Tax & Discount Rules:** Percentage & fixed calculation engine, conditional validation (`ANNUAL20`, `BRIGHT10`).
+- **Executive Telemetry:** Active MRR metrics, subscriber health counters, and recent activity logs.
 
-### Module C: Subscription Lifecycle
-- Strict 5-state lifecycle progression:
+### 3. Member 3: Staff Workspace & Quotation Builder
+- **Real-time Staff Dashboard:** Open quotations, active subscription pipeline ARR/MRR.
+- **Interactive Quotation Builder:** Real-time financial calculations, line-item taxes, payment term selectors ("Net 30", "Net 15"), and one-click quotation-to-subscription conversion.
+- **5-State Subscription Pipeline:**
   $$\text{Draft} \longrightarrow \text{Quotation} \longrightarrow \text{Confirmed} \longrightarrow \text{Active} \longrightarrow \text{Closed}$$
-- Prevention of illegal state jumps with server-side and client-side validation.
-- Audit trail & history timeline logging every transition with timestamps, staff identity, and notes.
-- Pause / Resume toggle for Active subscriptions (stored cleanly via `isPaused`).
-- Contract renewal term extension (+1, +3, +6, +12 months).
-- Confirmation modals before executing critical status changes.
+  with pause/resume, audit timelines, and term extensions.
+
+### 4. Member 4: Customer Portal & Invoicing (SUBNEX)
+- **Customer Self-Service:** Subscription management, plan upgrades, instant checkout, and cancellation workflows.
+- **Invoice & Payment Ledger:** Filterable invoices, downloadable PDFs, and payment receipts.
+- **Profile & Notification Center:** Organization details, billing addresses, and transactional notifications.
 
 ---
 
-## Design System Compliance (`design.md`)
+## 🎨 Design System Compliance (`design.md`)
 
 - **Canvas Background:** `#fcfbf9`
 - **Surface:** `#ffffff`
 - **Subtle Background:** `#f4f3f0`
 - **Primary Text:** `#111827`
-- **Secondary Text:** `#6b7280`
-- **Strong Borders:** `2px solid #000000` with hard drop-shadows
-- **Primary Action Accent:** `#ff4f00` (Orange buttons)
-- **Secondary Accent:** `#2563eb` (Blue accents)
-- **Typography:** Inter (body, headings) & JetBrains Mono (monospaced metrics, IDs, badges)
+- **Strong Borders:** `2px solid #000000` with tactile hard drop-shadows (`box-shadow: 2px 2px 0 #000`)
+- **Primary Accent:** `#ff4f00` (Vermilion orange CTAs)
+- **Secondary Accent:** `#2563eb` (Royal blue highlights)
+- **Typography:** Inter (headings and body) & JetBrains Mono (badges, metrics, IDs, code)
 
 ---
 
-## Getting Started
+## 🚀 Quick Start Guide
 
 ### 1. Install Dependencies
 ```bash
-# In the root directory:
-npm run install:all
+# In the root repository directory:
+cd backend && npm install
+cd ../frontend && npm install
 ```
 
-### 2. Run Backend Server (Express + MongoDB)
+### 2. Configure Environment Variables
+Create or edit `backend/.env`:
+```env
+PORT=5000
+MONGO_URI=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/brightloop
+JWT_SECRET=brightloop_secure_secret_key_2026
+ADMIN_EMAIL=admin@brightloop.com
+ADMIN_PASSWORD=Admin@12345
+```
+
+### 3. Seed Administrator Account
 ```bash
-cd server
+cd backend
+npm run seed:admin
+```
+
+### 4. Launch Development Servers
+```bash
+# Terminal 1: Backend API (port 5000)
+cd backend
+npm run dev
+
+# Terminal 2: Frontend SPA (port 5173)
+cd frontend
 npm run dev
 ```
-*The backend runs on `http://localhost:5000` with automatic MongoDB connection and graceful in-memory fallback.*
 
-### 3. Run Frontend (React + Vite)
-```bash
-cd client
-npm run dev
-```
-*The frontend runs on `http://localhost:5173`.*
-
----
-
-## Team Integration Reference
-
-- **Member 1 (Auth & RBAC):** Replace mock staff headers in [api.js](file:///c:/Users/Vishnu/maketon/makeaton/client/src/services/api.js) with JWT bearer token.
-- **Member 2 (Admin Catalog & Taxes):** Replace routes in [catalogMockRoutes.js](file:///c:/Users/Vishnu/maketon/makeaton/server/src/routes/catalogMockRoutes.js) with real Product/Plan/Customer endpoints.
-- **Member 4 (Invoices & Payments):** Consume [Subscription.js](file:///c:/Users/Vishnu/maketon/makeaton/server/src/models/Subscription.js) when status transitions to `Active` to trigger billing cycles.
+Open your browser at `http://localhost:5173`.
